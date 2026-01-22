@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1040">
-    <title>Keralasree Order Form</title>
+    <title>Keralasree Order Pro - Fixed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
@@ -43,7 +43,7 @@
 <div class="container">
     <div class="config-bar">
         <div> Institution: <input type="text" id="instName" style="width:70%" oninput="saveDraft()"> </div>
-        <div> Budget: ₹<input type="number" id="budget" style="width:70%" oninput="saveDraft()"> </div>
+        <div> Budget: ₹<input type="number" id="budget" style="width:70%" oninput="saveDraft(); updateTotalsOnly()"> </div>
         <div> 
             Type: 
             <select id="typeFilter" style="width:70%" onchange="renderTable()">
@@ -749,7 +749,11 @@ PATENT AJAMAMSA RASAYANAM 400GM 169
 
             html += `<tr class="${q > 0 ? 'selected-row' : ''}">
                 <td>${sl++}</td><td>${m.name}</td><td>${price}</td>
-                <td><input type="number" class="qty-input" value="${q}" onchange="updateQty('${m.name}', this.value)"></td>
+                <td>    <input type="number" 
+           class="qty-input" 
+           value="${q > 0 ? q : ''}" 
+           placeholder="Qty" 
+           oninput="updateQty('${m.name}', this.value)"></td>
                 <td>₹${sub}</td>
             </tr>`;
         });
@@ -759,12 +763,38 @@ PATENT AJAMAMSA RASAYANAM 400GM 169
         document.getElementById('balance').innerText = (bud - total).toFixed(2);
     }
 
-    function updateQty(name, val) {
-        let q = parseInt(val) || 0;
-        if(q > 0) order[name] = q; else delete order[name];
-        saveDraft(); renderTable();
+function updateQty(name, val) {
+    let q = parseInt(val);
+    
+    if (!isNaN(q) && q > 0) {
+        order[name] = q;
+    } else {
+        delete order[name];
     }
-
+    
+    saveDraft();
+    updateTotalsOnly(); 
+}
+function updateTotalsOnly() {
+    let total = calculateTotal();
+    let grandTotalElement = document.getElementById('grandTotal');
+    let balanceElement = document.getElementById('balance');
+    let budgetInput = document.getElementById('budget');
+    
+     grandTotalElement.innerText = total.toFixed(2);
+    
+    let bud = parseFloat(budgetInput.value) || 0;
+    let balance = bud - total;
+       
+    balanceElement.innerText = balance.toFixed(2);
+       if (balance < 0) {
+        balanceElement.style.color = "#ff5252";
+        balanceElement.style.fontWeight = "bold";
+    } else {
+        balanceElement.style.color = "white"; 
+        balanceElement.style.fontWeight = "normal";
+    }
+}
     function saveDraft() {
         localStorage.setItem('ks_final_draft', JSON.stringify({
             instName: document.getElementById('instName').value,
@@ -777,7 +807,6 @@ PATENT AJAMAMSA RASAYANAM 400GM 169
         if(confirm("Reset all data?")) { order = {}; localStorage.removeItem('ks_final_draft'); location.reload(); }
     }
 
-    // --- ശരിയായ CALCULATE TOTAL ഫംഗ്ഷൻ ---
     function calculateTotal() {
         return meds.reduce((s, m) => {
             const q = order[m.name] || 0;
@@ -785,8 +814,7 @@ PATENT AJAMAMSA RASAYANAM 400GM 169
         }, 0);
     }
 
-    // --- ഫിക്സ്ഡ് സ്മാർട്ട് ഓട്ടോമേഷൻ ---
-// --- സ്മാർട്ട് ഓട്ടോമേഷൻ ലോജിക് (പൂർണ്ണരൂപം) ---
+
 
 function smartAutomate() {
     try {
@@ -811,7 +839,7 @@ function smartAutomate() {
                 });
             }
         } else {
-            // 1. പ്രാഥമിക അഡ്ജസ്റ്റ്മെന്റ്
+           
             let currentTotal = calculateTotal();
             if (currentTotal > budget) {
                 scaleDownProportional(budget, selectedNames);
@@ -819,8 +847,7 @@ function smartAutomate() {
                 fillProportional(budget, selectedNames);
             }
 
-            // 2. ആവർത്തിച്ചുള്ള സ്വാപ്പിംഗ് (Automated Loop)
-            // മരുന്നുകൾ അങ്ങോട്ടും ഇങ്ങോട്ടും മാറ്റി ബജറ്റ് പരമാവധി അടുപ്പിക്കുന്നു
+           
             let improved = true;
             let safetyLimit = 0;
             while (improved && safetyLimit < 100) {
@@ -829,7 +856,7 @@ function smartAutomate() {
             }
         }
 
-        // 3. ഇനിയും വിടവുണ്ടെങ്കിൽ പുതിയ മരുന്ന് നിർദ്ദേശിക്കുന്നു
+        
         fineTuneBudgetSuggestions(budget);
 
         renderTable();
@@ -841,7 +868,7 @@ function smartAutomate() {
     }
 }
 
-// സ്വാപ്പിംഗ് ലോജിക് (ബജറ്റ് അടുപ്പിക്കാൻ എണ്ണം അങ്ങോട്ടും ഇങ്ങോട്ടും മാറ്റുന്നു)
+
 function fineTuneBySwapping(limit, names) {
     let currentTotal = calculateTotal();
     let gap = limit - currentTotal;
@@ -855,13 +882,13 @@ function fineTuneBySwapping(limit, names) {
             for (let alt of activeMeds) {
                 let altPrice = alt.rate * 1.05;
                 
-                // നിലവിലുള്ള 'm' ഒന്ന് കുറച്ച് 'alt' ഒന്ന് കൂട്ടിയാൽ ബജറ്റിനോട് അടുക്കുമോ എന്ന് നോക്കുന്നു
+              
                 let potentialTotal = (currentTotal - mPrice) + altPrice;
                 
                 if (potentialTotal <= limit && potentialTotal > currentTotal + 0.1) {
                     order[m.name]--;
                     order[alt.name] = (order[alt.name] || 0) + 1;
-                    return true; // ഒരു മാറ്റം വരുത്തി, വീണ്ടും ലൂപ്പ് ചെയ്യാൻ അനുവാദം നൽകുന്നു
+                    return true; 
                 }
             }
         }
@@ -930,7 +957,7 @@ function fineTuneBudgetSuggestions(limit) {
     }
 }
 
-// ടോട്ടൽ കൃത്യമായി കണക്കാക്കാൻ
+
 function calculateTotal() {
     return meds.reduce((s, m) => {
         const q = order[m.name] || 0;
@@ -951,19 +978,18 @@ function generatePDF() {
 
         const totalPagesExp = "{total_pages_count_string}";
 
-        // --- ഹെഡർ ഭാഗം ---
-        doc.setFontSize(16);
-        doc.setTextColor(27, 94, 32); // ഗ്രീൻ കളർ ഹെഡറിന് മാത്രം
+               doc.setFontSize(16);
+        doc.setTextColor(27, 94, 32); 
         doc.text("KERALASREE AYURVEDIC ORDER FORM", 105, 15, { align: "center" });
         
         doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0); // കറുപ്പ് നിറം
+        doc.setTextColor(0, 0, 0); 
         doc.text(`Institution: ${inst}`, 14, 25);
         doc.text(`Date: ${formattedDate}`, 196, 25, { align: "right" });
 
-        // --- ബജറ്റ് സമ്മറി ബോക്സ് ---
+       
         let currentTotal = calculateTotal();
-        doc.setDrawColor(0, 0, 0); // വരകൾക്കും കറുപ്പ് നിറം
+        doc.setDrawColor(0, 0, 0); 
         doc.line(14, 28, 196, 28);
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
@@ -982,14 +1008,14 @@ function generatePDF() {
             }
         });
 
-        // --- ടേബിൾ ജനറേഷൻ ---
+       
         doc.autoTable({
             startY: 42,
             head: [['Sl', 'Medicine Name', 'Rate+GST', 'Qty', 'Total']],
             body: rows,
             theme: 'striped',
             headStyles: { fillColor: [27, 94, 32], halign: 'center', textColor: [255, 255, 255] },
-            bodyStyles: { textColor: [0, 0, 0], fontSize: 10 }, // ടേബിൾ കണ്ടന്റ് കറുപ്പ് നിറത്തിൽ
+            bodyStyles: { textColor: [0, 0, 0], fontSize: 10 }, 
             columnStyles: {
                 0: { halign: 'center' },
                 2: { halign: 'right' },
@@ -1006,12 +1032,12 @@ function generatePDF() {
                     pageStr = pageStr + " of " + totalPagesExp;
                 }
                 doc.setFontSize(9);
-                doc.setTextColor(0, 0, 0); // പേജ് നമ്പറും കറുപ്പ്
+                doc.setTextColor(0, 0, 0); 
                 doc.text(pageStr, 196, pageHeight - 10, { align: "right" });
             }
         });
 
-        // --- അവസാന ഭാഗം (Grand Total & Budget Note) ---
+      
         const finalY = doc.lastAutoTable.finalY + 10;
         const pageHeight = doc.internal.pageSize.height;
         let yPos = (finalY > pageHeight - 40) ? (doc.addPage(), 20) : finalY;
@@ -1022,7 +1048,7 @@ function generatePDF() {
         doc.text(`Total Including GST: RS. ${currentTotal.toFixed(2)}`, 14, yPos + 5);
         
         doc.setFontSize(11);
-        doc.setFont(undefined, 'bold'); // ബജറ്റ് നോട്ട് ബോൾഡ് ആക്കി
+        doc.setFont(undefined, 'bold'); 
         doc.text(`Please limit this order to budget amount RS. ${budget.toFixed(2)}`, 14, yPos + 15);
 
         if (typeof doc.putTotalPages === 'function') {
@@ -1051,6 +1077,4 @@ function generatePDF() {
     window.onload = init;
 </script>
 </body>
-
 </html>
-
