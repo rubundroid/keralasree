@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keralasree Order Pro - Fixed</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root { --primary: #1b5e20; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .config-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .sticky-controls { position: sticky; top: 0; background: white; z-index: 100; padding: 10px 0; border-bottom: 2px solid #ddd; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+        .btn-auto { background: #ef6c00; } .btn-pdf { background: #d32f2f; } .btn-reset { background: #616161; } .btn-save { background: #1976d2; }
+        .table-wrap { height: 55vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--primary); color: white; padding: 12px; position: sticky; top: 0; z-index: 10; text-align: left; }
+        td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .qty-input { width: 60px; border: 2px solid var(--primary); text-align: center; font-weight: bold; border-radius: 4px; }
+        .footer { background: var(--primary); color: white; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 1.3em; margin-top: 15px; }
+        .selected-row { background-color: #fff9c4 !important; }
+    </style>
+</head>
+<body>
+<div class="header-line">കേരളശ്രീ ആയുർവേദിക് ഓർഡർ ഫോം</div>
+
+<style>
+    .header-line {
+        text-align: center;
+        background: #1b5e20;
+        color: white;
+        padding: 5px 0;
+        font-weight: bold;
+        font-size: 0.9em;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+    }
+</style>
+<div class="container">
+    <div class="config-bar">
+        <div> Institution: <input type="text" id="instName" style="width:70%" oninput="saveDraft()"> </div>
+        <div> Budget: ₹<input type="number" id="budget" style="width:70%" oninput="saveDraft()"> </div>
+        <div> 
+            Type: 
+            <select id="typeFilter" style="width:70%" onchange="renderTable()">
+                <option value="ALL">ALL TYPES</option>
+                <option value="ARISHTA">ARISHTA</option><option value="RASAKRI">RASAKRI</option>
+                <option value="LEHYAM">LEHYAM</option><option value="GHRITAM">GHRITAM</option>
+                <option value="CHOORNA">CHOORNA</option><option value="KASHAYAM">KASHAYAM</option>
+                <option value="THAILAM">THAILAM</option><option value="ARKAM">ARKAM</option>
+                <option value="KC">KC</option><option value="KSC">KSC</option>
+                <option value="PATENT">PATENT</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="sticky-controls">
+        <div style="width: 100%; margin-bottom: 5px;">
+            <input type="text" id="searchInput" placeholder="Search Medicine Name..." onkeyup="renderTable()" style="width: 100%; border: 2px solid var(--primary); padding: 12px;">
+        </div>
+        <button class="btn-auto" onclick="smartAutomate()">⚡ Smart Automate</button>
+        <button class="btn-save" onclick="exportJSON()">💾 Save JSON</button>
+        <button class="btn-save" style="background:#546e7a" onclick="document.getElementById('fIn').click()">📂 Import JSON</button>
+        <input type="file" id="fIn" style="display:none" onchange="importJSON(event)">
+        <button class="btn-pdf" onclick="generatePDF()">📄 PDF Report</button>
+        <button class="btn-reset" onclick="resetForm()">🔄 Reset All</button>
+        <label style="margin-left:auto; cursor:pointer"><input type="checkbox" id="showSel" onchange="renderTable()"> <b>Selected Only</b></label>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th width="50">Sl</th>
+                    <th>Medicine Name</th>
+                    <th width="120">Rate+GST</th>
+                    <th width="100">Qty</th>
+                    <th width="120">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <span>Grand Total: ₹<span id="grandTotal">0.00</span></span>
+        <span>Balance: ₹<span id="balance">0.00</span></span>
+    </div>
+</div>
+
+<script>
+    // --- RAW DATA ---
+    const rawData = `
+ARISHTA ABHAYARISHTAM 450ML 48
+ARISHTA	ABHAYARISHTAM 200ML	28
+ARISHTA	AMRITARISHTAM 450ML	57
+ARISHTA	AMRITARISHTAM 200ML	30
+ARISHTA	ARAGWADHARISHTAM 450ML	60
+ARISHTA	ARAGWADHARISHTAM 200ML	35
+ARISHTA	ARAVINDASAVAM 450ML	51
+ARISHTA	ARAVINDASAVAM 200ML	28
+ARISHTA	ASHOKARISHTAM 450ML	48
+ARISHTA	ASHOKARISHTAM 200ML	30
+ARISHTA	ASHWAGANDHARISHTAM 450ML	90
+ARISHTA	ASHWAGANDHARISHTAM 200ML	45
+ARISHTA	AYASKRITI 450ML	55
+ARISHTA	AYASKRITI 200ML	30
+ARISHTA	BALARISHTAM 450ML	60
+ARISHTA	BALARISHTAM 200ML	34
+ARISHTA	BHRINGARAJASAVAM 450ML	75
+ARISHTA	BHRINGARAJASAVAM 200ML	40
+ARISHTA	CHANDANASAVAM 450ML	47
+ARISHTA	CHANDANASAVAM 200ML	30
+ARISHTA	CHAVIKASAVAM 450ML	65
+ARISHTA	CHAVIKASAVAM 200ML	35
+ARISHTA	DANTYARISHTAM 450ML	50
+ARISHTA	DANTYARISHTAM 200ML	30
+ARISHTA	DASHAMOOLARISHTAM 450ML	70
+ARISHTA	DASHAMOOLARISHTAM 200ML	38
+ARISHTA	DHATRYARISHTAM 450ML	90
+ARISHTA	DHATRYARISHTAM 200ML	48
+ARISHTA	DHANWANTARARISHTAM 450ML	65
+ARISHTA	DHANWANTARARISHTAM 200ML	38
+ARISHTA	DRAKSHARISHTAM 450ML	70
+ARISHTA	DRAKSHARISHTAM 200ML	40
+ARISHTA	DURALABHARISHTAM 450ML	57
+ARISHTA	DURALABHARISHTAM 200ML	32
+ARISHTA	JEERAKADYARISHTAM 450ML	84
+ARISHTA	JEERAKADYARISHTAM 200ML	42
+ARISHTA	KANAKASAVAM 450ML	43
+ARISHTA	KANAKASAVAM 200ML	28
+ARISHTA	KHADIRARISHTAM 450ML	75
+ARISHTA	KHADIRARISHTAM 200ML	38
+ARISHTA	KOOSHMANDASAVAM 450ML	90
+ARISHTA	KOOSHMANDASAVAM 200ML	48
+ARISHTA	KUDAJARISHTAM 450ML	60
+ARISHTA	KUDAJARISHTAM 200ML	34
+ARISHTA	KUMARYASAVAM 450ML	60
+ARISHTA	KUMARYASAVAM 200ML	34
+ARISHTA	LODRASAVAM 450ML	67
+ARISHTA	LODRASAVAM 200ML	34
+ARISHTA	LOHASAVAM 450ML	53
+ARISHTA	LOHASAVAM 200ML	30
+ARISHTA	MADOOKASAVAM 450ML	84
+ARISHTA	MADOOKASAVAM 200ML	45
+ARISHTA	MOOLAKADYARISHTAM 450ML	90
+ARISHTA	MOOLAKADYARISHTAM 200ML	48
+ARISHTA	MRIDWEEKARISHTAM 450ML	70
+ARISHTA	MRIDWEEKARISHTAM 200ML	38
+ARISHTA	MUSTHARISHTAM 450ML	53
+ARISHTA	MUSTHARISHTAM 200ML	30
+ARISHTA	PANCHAKOLASAVAM 450ML	55
+ARISHTA	PANCHAKOLASAVAM 200ML	34
+ARISHTA	PARPADAKADYARISHTAM 450ML	55
+ARISHTA	PARPADAKADYARISHTAM 200ML	30
+ARISHTA	PARTHADYARISHTAM 450ML	54
+ARISHTA	PARTHADYARISHTAM 200ML	30
+ARISHTA	PIPPALYASAVAM 450ML	52
+ARISHTA	PIPPALYASAVAM 200ML	30
+ARISHTA	POOTIKASAVAM 450ML	52
+ARISHTA	POOTIKASAVAM 200ML	30
+ARISHTA	PUNARNAVASAVAM 450ML	48
+ARISHTA	PUNARNAVASAVAM 200ML	28
+ARISHTA	ROHITHAKARISHTAM 450ML	52
+ARISHTA	ROHITHAKARISHTAM 200ML	30
+ARISHTA	SARASWATHARISHTAM 450ML	450
+ARISHTA	SARASWATHARISHTAM 200ML	250
+ARISHTA	SHARIBADYASAVAM 450ML	60
+ARISHTA	SHARIBADYASAVAM 200ML	38
+ARISHTA	TRIPHALARISHTAM 450ML	60
+ARISHTA	TRIPHALARISHTAM 200ML	38
+ARISHTA	USEERASAVAM 450ML	54
+ARISHTA	USEERASAVAM 200ML	30
+ARISHTA	VASHRISHTAM 450ML	70
+ARISHTA	VASHRISHTAM 200ML	40
+ARISHTA	VIDARYADYASAVAM 450ML	65
+ARISHTA	VIDARYADYASAVAM 200ML	38
+ARISHTA	VILANGARISHTAM 450ML	60
+ARISHTA	VILANGARISHTAM 200ML	35
+RASAKRI	ELANEERKUZHAMBU 10GM	35
+RASAKRI	SAMSKRITHA MADHU 200GM	90
+RASAKRI	DHANYAMLAM 450ml	33
+RASAKRI	DHANYAMLAM 5L	330
+LEHYAM	AGASTYA RASAYANAM 200GM	52
+LEHYAM	AGASTYA RASAYANAM 500GM	128
+LEHYAM	AJAMAMSARASAYANAM 400GM	169
+LEHYAM	AMRITHAPRASHAM 200GM	84
+LEHYAM	AMRITHAPRASHAM 500GM	208
+LEHYAM	ASHWAGANDHADI LEHYAM 200GM	67
+LEHYAM	ASHWAGANDHADI LEHYAM 400GM	132
+LEHYAM	BRAHMA RASAYANAM 200GM	50
+LEHYAM	BRAHMA RASAYANAM 500GM	120
+LEHYAM	CHINCHADI LEHYAM 200GM	85
+LEHYAM	CHYAVANAPRASHAM 200GM	58
+LEHYAM	CHYAVANAPRASHAM 500GM	140
+LEHYAM	DASAMOOLA RASAYANAM 100GM	95
+LEHYAM	DASHAMOOLAHAREETAKI 200GM	48
+LEHYAM	DASHAMOOLAHAREETAKI 500GM	120
+LEHYAM	DRAKSHADI LEHYAM 200GM	85
+LEHYAM	DRAKSHADI LEHYAM 500GM	215
+LEHYAM	HARIDRAKHANDAM 50GM	23
+LEHYAM	TRIVRIT LEHYAM 200GM	54
+LEHYAM	INCHI LEHYAM 100GM	80
+LEHYAM	JEERAKADILEHYAM 100GM	130
+LEHYAM	KALYANAGULAM 200GM	45
+LEHYAM	KOOSHMANDA RASAYANAM 200GM	68
+LEHYAM	KOOSHMANDA RASAYANAM 500GM	160
+LEHYAM	MANIBHADRAM LEHYAM 200GM	54
+LEHYAM	MANIBHADRAM LEHYAM 500GM	130
+LEHYAM	NARASIMHA RASAYANAM 200GM	70
+LEHYAM	PANCHAJEERAKAGUDAM 200GM	85
+LEHYAM	SHATAVARI GULAM 200GM	72
+LEHYAM	SHATAVARI GULAM 500GM	174
+LEHYAM	SUKUMARA RASAYANAM 200GM	97
+LEHYAM	SUKUMARA RASAYANAM 500GM	240
+LEHYAM	THALEESAPATHRADI VADAKAM 200GM	90
+LEHYAM	THALEESAPATHRADI VADAKAM 500GM	225
+LEHYAM	THALEESAPATHRADI VADAKAM 50GM	25
+LEHYAM	THENGIN POOKKULADI LEHYAM 400GM	150
+LEHYAM	VIDARYADI LEHYAM 200GM	62
+LEHYAM	VIDARYADI LEHYAM 500GM	152
+LEHYAM	VILWADI LEHYAM 200GM	58
+LEHYAM	VILWADI LEHYAM 500GM	145
+LEHYAM	VYOSHADI VATAKAM 50GM	21
+GHRITAM	BRAHMI GHRITAM 200ML	155
+GHRITAM	DADIMADI GHRITHAM 200ML	155
+GHRITAM	DHANWANTHARAM GHRITHAM 200ML	150
+GHRITAM	DHATRYDI GHRITAM 200ML	138
+GHRITAM	GULGULUTHIKTHAKAM GHRITAM 200ML	205
+GHRITAM	INDUKANTHAM GHRITAM 200ML	170
+GHRITAM	JEEVANTIYADI GHRITAM 200ML	605
+GHRITAM	KALYANAKAM GHRITHAM 200ML	140
+GHRITAM	MAHAKALYANAKA GHRIAM 200ML	173
+GHRITAM	MAHATIKTAKAM GHRITAM 200ML	145
+GHRITAM	PATOLADI GHRITAM 200ML	140
+GHRITAM	PHALASARPIS 200ML	164
+GHRITAM	SARASWATHAGHRITAM 200ML	130
+GHRITAM	SUKUMARA GHRITAM 200ML	178
+GHRITAM	THRIPHALA GHRITHAM 200ML	125
+GHRITAM	TIKTAKA GHRITAM 200ML	150
+GHRITAM	VAJRAKA GHRITHAM 200ML	139
+GHRITAM	VIDARYADI GHRITAM 200ML	140
+GHRITAM	DRAKSHADI GHRITAM 200ML	150
+GHRITAM	VASTYAMAYANTHAKA GHRITAM 200ML	250
+CHOORNA	ABHAYAADI CHOORNAM 50GM	40
+CHOORNA	ABHAYAADI CHOORNAM 500GM	400
+CHOORNA	AMRUTADI CHOORNAM 50GM	23
+CHOORNA	AMRUTADI CHOORNAM 500GM	235
+CHOORNA	ASNA CHOORNAM 50GM	17
+CHOORNA	APARAJITHA CHOORNAM 50GM	25
+CHOORNA	ASHTA CHOORNAM 10GM	11
+CHOORNA	ASHTA CHOORNAM 50GM	39
+CHOORNA	ASHTA CHOORNAM 500GM	380
+CHOORNA	AVIPATHI CHOORNAM 10GM	11
+CHOORNA	AVIPATHI CHOORNAM 500GM	360
+CHOORNA	AVIPATHI CHOORNAM 50GM	37
+CHOORNA	DADIMASHTAKAM CHOORNAM 50GM	32
+CHOORNA	DADIMASHTAKAM CHOORNAM 500GM	310
+CHOORNA	ELADIGANAM CHOORNAM 50GM	53
+CHOORNA	ELADIGANAM CHOORNAM 500GM	520
+CHOORNA	GOKSHURA CHOORNAM 50GM	28
+CHOORNA	GOKSHURA CHOORNAM 500GM	275
+CHOORNA	GRIHADHOOMADI CHOORNAM 50GM	25
+CHOORNA	GRIHADHOOMADI CHOORNAM 500GM	250
+CHOORNA	GULGULUPANCHAPALA CHOORNAM 50GM	52
+CHOORNA	GULGULUPANCHAPALA CHOORNAM 500GM	520
+CHOORNA	HINGUVACHADI CHOORNAM 50GM	35
+CHOORNA	HINGUVACHADI CHOORNAM 500GM	345
+CHOORNA	INDUPPUKANAM CHOORNAM 50GM	35
+CHOORNA	INDUPPUKANAM CHOORNAM 500GM	345
+CHOORNA	JATAMAYADI CHOORNAM 50GM	35
+CHOORNA	JATAMAYADI CHOORNAM 500GM	345
+CHOORNA	JEERAKADI CHOORNAM 50GM	59
+CHOORNA	JEERAKADI CHOORNAM 500GM	580
+CHOORNA	KACHOORADI CHOORNAM 10GM	38
+CHOORNA	KALYANAKAKSHARAM 200GM	200
+CHOORNA	KALYANAKAKSHARAM 50GM	52
+CHOORNA	KARPOORADI CHOORNAM 50GM	44
+CHOORNA	KARPOORADI CHOORNAM 500GM	430
+CHOORNA	KOLAKULATHADI CHOORNAM 50GM	20
+CHOORNA	KOLAKULATHADI CHOORNAM 500GM	190
+CHOORNA	KOTTAMCHUKADI CHOORNAM 50GM	24
+CHOORNA	KOTTAMCHUKADI CHOORNAM 500GM	230
+CHOORNA	NAGARADI CHOORNAM 50GM	33
+CHOORNA	NAGARADI CHOORNAM 500GM	320
+CHOORNA	NALPAMARADI CHOORNAM 50GM	30
+CHOORNA	NALPAMARADI CHOORNAM 500GM	250
+CHOORNA	NIMBADI CHOORNAM 50GM	28
+CHOORNA	NIMBADI CHOORNAM 500GM	275
+CHOORNA	PANCHAKOLA CHOORNAM 50GM	50
+CHOORNA	PANCHAKOLA CHOORNAM 500GM	500
+CHOORNA	PUSHYANUGIM CHOORNAM 50GM	55
+CHOORNA	PUSHYANUGIM CHOORNAM 500GM	550
+CHOORNA	RAJANYADI CHOORNAM 50GM	35
+CHOORNA	RAJANYADI CHOORNAM 500GM	350
+CHOORNA	RASNADI CHOORNAM 10GM	11
+CHOORNA	RASNADI CHOORNAM 50GM	33
+CHOORNA	RASNADI CHOORNAM 500GM	325
+CHOORNA	SARASWATHA CHOORNAM 50GM	55
+CHOORNA	SARASWATHA CHOORNAM 500GM	540
+CHOORNA	SATHAVARI CHOORNAM 50GM	42
+CHOORNA	SATHAVARI CHOORNAM 500GM	365
+CHOORNA	SHADDHARANAM CHOORNAM 50GM	75
+CHOORNA	SUDHARSANA CHOORNAM 50GM	27
+CHOORNA	SUDHARSANA CHOORNAM 500GM	285
+CHOORNA	TALEESAPATRADI CHOORNAM 10GM	11
+CHOORNA	TALEESAPATRADI CHOORNAM 50GM	30
+CHOORNA	TALEESAPATRADI CHOORNAM 500GM	295
+CHOORNA	THRIKATU CHOORNAM 50GM	52
+CHOORNA	THRIKATU CHOORNAM 500GM	517
+CHOORNA	TRIPHALADI CHOORNAM (VARA CHOORNAM) 50GM	28
+CHOORNA	TRIPHALADI CHOORNAM (VARA CHOORNAM) 500GM	275
+CHOORNA	VAISWANARA CHOORNAM 50GM	30
+CHOORNA	VAISWANARA CHOORNAM 500GM	290
+CHOORNA	CHANDRAPRABHA PILLS 100NOS	152
+CHOORNA	CHANDANADI VARTHI 100NOS	485
+CHOORNA	CHUKKUMTIPPALYADI PILLS 100NOS	104
+CHOORNA	DASAMGAM GULIKA 100NOS	410
+CHOORNA	DHANWANTARAM PILLS 100NOS	107
+CHOORNA	GOPECHANDANADI PILLS 100NOS	152
+CHOORNA	GOROCHANADI PILLS 100NOS	1250
+CHOORNA	KAISHOROGULGULU PILLS 100NOS	205
+CHOORNA	KHADIRA PILLS 100NOS	450
+CHOORNA	KRIMIGHNA GULIKA 100NOS	150
+CHOORNA	MANASAMITRAM PILLS 100NOS	2010
+CHOORNA	MANDOORAVADAKAM 100NOS	225
+CHOORNA	MARMA VATTU 100NOS	240
+CHOORNA	MUKKAMUKKATUKADI 100NOS	105
+CHOORNA	RAJAPRAVARTHANA VATIKA 100NOS	110
+CHOORNA	SWASANANDAM PILLS 100NOS	104
+CHOORNA	VAYU GULIKA 100NOS	260
+CHOORNA	VETTUMARAN PILLS 100NOS	100
+CHOORNA	VILWADI PILLS 100NOS	200
+CHOORNA	VIMALA VARTHI 100NOS	640
+CHOORNA	YOGARAJA GULGULU PILLS 100NOS	180
+KASHAYAM	AMRUTHOTHARM KASHAYAM 200ML	62
+KASHAYAM	ASHTAVARGAM KASHAYAM 200ML	67
+KASHAYAM	BALAGEERAKADI KASHAYAM 200ML	60
+KASHAYAM	BALAGULUCHYADI KASHAYAM 200ML	60
+KASHAYAM	BALAMOOLADI KASHAYAM 200ML	56
+KASHAYAM	BHADRWDARVADI KASHAYAM 200ML	68
+KASHAYAM	BRIHATYADI KASHAYAM 200ML	62
+KASHAYAM	CHERIYA RASNADI KASHAM 200ML	110
+KASHAYAM	CHIRUVILWADI KASHAM 200ML	88
+KASHAYAM	DASHAMOOL KADUTHRAYADI KASHAYAM 200ML	75
+KASHAYAM	DHANADANAYANADI KASHAYAM 200ML	88
+KASHAYAM	DHANWANTARAM KASHYAM 200ML	85
+KASHAYAM	DRAKSADI KASHAYAM 200ML	85
+KASHAYAM	DUSPARSAKADI KASHAYAM 200ML	88
+KASHAYAM	ELAKANADI KASHAYAM 200ML	75
+KASHAYAM	GANDHARVA HASTHADI KASHAM 200ML	62
+KASHAYAM	GULGULU TIKTAKAM KASHAM 200ML	110
+KASHAYAM	GULUCHYADI KASHAYAM 200ML	97
+KASHAYAM	INDUKANTHAM KASHAYAM 200ML	65
+KASHAYAM	KOKILAKSHAM KASHAYAM 200ML	57
+KASHAYAM	MAHA MANJISHTADI KASHAYAM 200ML	85
+KASHAYAM	MAHA RASNADI KASHAYAM 200ML	104
+KASHAYAM	MAHATIKTAKAM KASHAYAM 200ML	115
+KASHAYAM	MANJISHTADI KASHAYAM 200ML	94
+KASHAYAM	MUSALIKHADIRADI KASHAYAM 200ML	57
+KASHAYAM	MUSTHAKARANJADI KASHAYAM 200ML	80
+KASHAYAM	NAYOPAYAM KASHYAM 200ML	95
+KASHAYAM	NIMBADI KASHYAM 200ML	67
+KASHAYAM	NIRGUNDYADI KASHAYAM 200ML	58
+KASHAYAM	NISHAKATAKADI KASHAYAM 200ML	65
+KASHAYAM	PANCHATHIKTHAKAM KASHAYAM 200ML	80
+KASHAYAM	PATHYADI KASHAYAM 200ML	68
+KASHAYAM	PATHYAKSHADHATRYADI KASHAYAM 200ML	72
+KASHAYAM	PATOLA MOOLADI KASHAYAM 200ML	70
+KASHAYAM	PATOLAKADUROHINYADI KASHAYAM 200ML	125
+KASHAYAM	PRASARINNIADI KASHAYAM 200ML	65
+KASHAYAM	PUNARNAVADI KASHAYAM 200ML	65
+KASHAYAM	RASNASAPTAKAM KASHAYAM 200ML	68
+KASHAYAM	RASNOUPAKULYADI KASHAYAM 200ML	90
+KASHAYAM	RASONADI KASHAYAM 200ML	100
+KASHAYAM	SAHACHARADI KASHAYAM 200ML	62
+KASHAYAM	SAPTASARAM KASHAYAM 200ML	72
+KASHAYAM	SATAVARI CHINNARUHADI KASHAYAM 200ML	110
+KASHAYAM	SUKUMARAM KASHAYAM 200ML	72
+KASHAYAM	THIPPALI KASHAYAM 200ML	80
+KASHAYAM	THRAYANTHYADI KASHYAM 200ML	100
+KASHAYAM	TIKTAKAM KASHAYAM 200ML	100
+KASHAYAM	ULLIVETTATUKADI KASHAYAM 200ML	80
+KASHAYAM	VAJRAKAM KASHAYAM 200ML	68
+KASHAYAM	VARADI KASHAYAM 200ML	80
+KASHAYAM	VARANADI KASHAYAM 200ML	65
+KASHAYAM	VASHGULUCHIADI KASHAYAM 200ML	60
+KASHAYAM	VIDARYADI KASHAYAM 200ML	70
+KASHAYAM	VILANGADI KASHASYAM 200ML	70
+KASHAYAM	VYAGHRYADI KASHAYAM 200ML	80
+KASHAYAM	VYOSHADI KASHAYAM 200ML	70
+THAILAM	ANU TAILAM 10ML	38
+THAILAM	ARIMEDADI OIL 450ML	180
+THAILAM	ARIMEDADI OIL 200ML	80
+THAILAM	ARIMEDADI OIL 100ML	52
+THAILAM	ASANA ELADI OIL(COCONUT OIL) 450ML	325
+THAILAM	ASANA ELADI OIL(COCONUT OIL) 200ML	146
+THAILAM	ASANA ELADI OIL(COCONUT OIL) 100ML	76
+THAILAM	ASANA ELADI THAILAM 450ML	218
+THAILAM	ASANA ELADI THAILAM 200ML	97
+THAILAM	ASANA MANJISHTADI OIL 450ML	195
+THAILAM	ASANA MANJISHTADI OIL 200ML	86
+THAILAM	ASANAVILWADI OIL(COCONUT OIL) 450ML	272
+THAILAM	ASANAVILWADI OIL(COCONUT OIL) 200ML	122
+THAILAM	ASANAVILWADI OIL(COCONUT OIL) 100ML	62
+THAILAM	ASANAVILWADI THAILAM 450ML	160
+THAILAM	ASANAVILWADI THAILAM 200ML	73
+THAILAM	BALA TAILAM 10ML	40
+THAILAM	BALAGULUCHIADI OIL(COCONUT OIL) 450ML	272
+THAILAM	BALAGULUCHIADI OIL(COCONUT OIL) 200ML	122
+THAILAM	BALAGULUCHIADI OIL(COCONUT OIL) 100ML	62
+THAILAM	BALAGULUCHIADI THAILAM 450ML	160
+THAILAM	BALAGULUCHIADI THAILAM 200ML	73
+THAILAM	BALAGULUCHIADI THAILAM 100ML	40
+THAILAM	BALAHATADI OIL 450ML	160
+THAILAM	BALAHATADI OIL 200ML	73
+THAILAM	BALAHATADI COCONUT OIL 450ML	272
+THAILAM	BALAHATADI COCONUT OIL 200ML	123
+THAILAM	BALAHATADI COCONUT OIL 100ML	65
+THAILAM	BALASHWAGANDHADI TAILAM 450ML	225
+THAILAM	BALASHWAGANDHADI TAILAM 200ML	100
+THAILAM	BALASHWAGANDHADI TAILAM 100ML	55
+THAILAM	BRINGAMALAKADI OIL 450ML	195
+THAILAM	BRINGAMALAKADI OIL 200ML	87
+THAILAM	CHANDANADI TAILAM 450ML	223
+THAILAM	CHANDANADI TAILAM 200ML	100
+THAILAM	CHANDANADI TAILAM 100ML	55
+THAILAM	CHEMPARATHYADI KERAM 450ML	276
+THAILAM	CHEMPARATHYADI KERAM 200ML	125
+THAILAM	CHEMPARATHYADI KERAM 100ML	63
+THAILAM	CHINCHADI TAILAM 450ML	155
+THAILAM	CHINCHADI TAILAM 200ML	70
+THAILAM	CHINCHADI TAILAM 100ML	42
+THAILAM	DHANATHARA MEZHUKUPAKAM 450ML	230
+THAILAM	DHANATHARA MEZHUKUPAKAM 200ML	103
+THAILAM	DHANWANTARAM TAILAM 450ML	230
+THAILAM	DHANWANTARAM TAILAM 200ML	103
+THAILAM	DHANWANTARAM TAILAM 100ML	58
+THAILAM	DHANWANTARAM KUZHAMBU 450ML	240
+THAILAM	DHANWANTARAM KUZHAMBU 200ML	108
+THAILAM	DHANWANTRAM 101 TIMES 10ML	80
+THAILAM	DHANWANTRAM 14 TIMES 10ML	30
+THAILAM	DHANWANTRAM 14 TIMES 50ML	145
+THAILAM	DHANWANTRAM 7 TIMES 10ML	24
+THAILAM	DHANWANTRAM 7 TIMES 50ML	115
+THAILAM	DHURDURAPATRADI KERAM 450ML	335
+THAILAM	DHURDURAPATRADI KERAM 200ML	150
+THAILAM	DHURDURAPATRADI KERAM 100ML	75
+THAILAM	DURVADI KERAM 450ML	380
+THAILAM	DURVADI KERAM 200ML	165
+THAILAM	ELADI KERAM 450ML	314
+THAILAM	ELADI KERAM 200ML	143
+THAILAM	ELADI KERAM 100ML	70
+THAILAM	ELADI THAILAM 450ML	265
+THAILAM	ELADI THAILAM 200ML	118
+THAILAM	ERANDA THAILAM 450ML	180
+THAILAM	ERANDA THAILAM 200ML	90
+THAILAM	ERANDA THAILAM 100ML	48
+THAILAM	GANDHA THAILAM 10ML	50
+THAILAM	GANDHARVAHASTA TAILAM 450ML	250
+THAILAM	GANDHARVAHASTA TAILAM 200ML	110
+THAILAM	GANDHARVAHASTA TAILAM 50ML	28
+THAILAM	GOPATHMAJADI KERAM 450ML	360
+THAILAM	GOPATHMAJADI KERAM 200ML	162
+THAILAM	GUGGULUMARICHADI THAILAM 450ML	260
+THAILAM	GUGGULUMARICHADI THAILAM 200ML	124
+THAILAM	HIMASAGARA TAILAM 200ML	150
+THAILAM	HIMASAGARA TAILAM 100ML	80
+THAILAM	HINGUTHRIGUNAM ERANDAM 450ML	340
+THAILAM	HINGUTHRIGUNAM ERANDAM 10ML	38
+THAILAM	JATYADI TAILAM (COCONUT OIL) 450ML	276
+THAILAM	JATYADI TAILAM (COCONUT OIL) 200ML	125
+THAILAM	JATYADI TAILAM (COCONUT OIL) 100ML	66
+THAILAM	JEEVANTHYADI YAMAKAM 50ML	40
+THAILAM	KANJHUNNIADI OIL(COCONUT OIL) 450ML	307
+THAILAM	KANJHUNNIADI OIL(COCONUT OIL) 200ML	139
+THAILAM	KANJHUNNIADI OIL(COCONUT OIL) 100ML	70
+THAILAM	KANJHUNNIADI THAILAM 450ML	187
+THAILAM	KANJHUNNIADI THAILAM 200ML	84
+THAILAM	KARPASASTYADI TAILAM 450ML	177
+THAILAM	KARPASASTYADI TAILAM 200ML	80
+THAILAM	KARPASASTYADI TAILAM 100ML	48
+THAILAM	KARPOORADI TAILAM 450ML	294
+THAILAM	KARPOORADI TAILAM 200ML	133
+THAILAM	KARPOORADI TAILAM 100ML	68
+THAILAM	KOTTAMCHUKKADI TAILAM 450ML	173
+THAILAM	KOTTAMCHUKKADI TAILAM 200ML	78
+THAILAM	KOTTAMCHUKKADI TAILAM 100ML	48
+THAILAM	KSHEERABALA 101 TIMES 10ML	67
+THAILAM	KSHEERABALA 14 TIMES 10ML	33
+THAILAM	KSHEERABALA 7 TIMES 10ML	25
+THAILAM	KSHEERABALA OIL 450ML	200
+THAILAM	KSHEERABALA OIL 200ML	90
+THAILAM	KSHEERABALA OIL 100ML	50
+THAILAM	LAKSHADI OIL(COCONUT OIL) 450ML	304
+THAILAM	LAKSHADI OIL(COCONUT OIL) 200ML	136
+THAILAM	LAKSHADI OIL(COCONUT OIL) 100ML	68
+THAILAM	MADHUYISHTYADI THAILAM 450ML	275
+THAILAM	MADHUYISHTYADI THAILAM 200ML	123
+THAILAM	MADHUYISHTYADI THAILAM 100ML	68
+THAILAM	MAHACHANDANADI THAILAM 450ML	380
+THAILAM	MAHACHANDANADI THAILAM 200ML	170
+THAILAM	MAHACHANDANADI THAILAM 100ML	90
+THAILAM	MAHAMASHA THAILAM 450ML	310
+THAILAM	MAHAMASHA THAILAM 200ML	138
+THAILAM	MAHAMASHA THAILAM 100ML	74
+THAILAM	MAHANARAYANA TAILAM 450ML	285
+THAILAM	MAHANARAYANA TAILAM 200ML	128
+THAILAM	MAHANARAYANA TAILAM 100ML	68
+THAILAM	MALATHYADI KERAM 450ML	210
+THAILAM	MALATHYADI KERAM 200ML	94
+THAILAM	MURIVENNA 450ML	279
+THAILAM	MURIVENNA 200ML	132
+THAILAM	MURIVENNA 100ML	76
+THAILAM	NALPAMARADI KERAM 450ML	276
+THAILAM	NALPAMARADI KERAM 200ML	132
+THAILAM	NALPAMARADI KERAM 100ML	69
+THAILAM	NARAYANA THAILAM 450ML	300
+THAILAM	NARAYANA THAILAM 200ML	135
+THAILAM	NEELIBRINGADI KERAM 450ML	384
+THAILAM	NEELIBRINGADI KERAM 200ML	185
+THAILAM	NEELIBRINGADI KERAM 100ML	97
+THAILAM	NEELINIRGUNDIADI OIL 450ML	300
+THAILAM	NEELINIRGUNDIADI OIL 200ML	140
+THAILAM	NIMBA PATRADI OIL 450ML	250
+THAILAM	NIMBA PATRADI OIL 200ML	110
+THAILAM	NIMBAMRUTADI CASTOR OIL 450ML	200
+THAILAM	NIMBAMRUTADI CASTOR OIL 200ML	90
+THAILAM	NIMBAMRUTADI CASTOR OIL 100ML	50
+THAILAM	NIMBAMRUTADI TAILAM 450ML	200
+THAILAM	NIMBAMRUTADI TAILAM 200ML	90
+THAILAM	NISHOOSHIRADI OIL 450ML	220
+THAILAM	NISHOOSHIRADI OIL 200ML	100
+THAILAM	PARINATHAKERIKSHEERADI THAILAM 450ML	210
+THAILAM	PARINATHAKERIKSHEERADI THAILAM 200ML	94
+THAILAM	PINDATAILAM 450ML	170
+THAILAM	PINDATAILAM 200ML	77
+THAILAM	PINDATAILAM 100ML	42
+THAILAM	PIPPALYADI ANUVASANA THAILAM 450ML	195
+THAILAM	PIPPALYADI ANUVASANA THAILAM 200ML	87
+THAILAM	PRABHANJANAVIMARDHANAM TAILAM 450ML	200
+THAILAM	PRABHANJANAVIMARDHANAM TAILAM 200ML	90
+THAILAM	PRASARANYADI THAILAM 450ML	340
+THAILAM	PRASARANYADI THAILAM 200ML	152
+THAILAM	PRASARANYADI THAILAM 100ML	80
+THAILAM	RASOTHAMADI LEPAM 50GM	49
+THAILAM	RASNADI THAILAM 450ML	170
+THAILAM	RASNADI THAILAM 200ML	77
+THAILAM	SAHACHARADI KUZHAMBU 450ML	220
+THAILAM	SAHACHARADI KUZHAMBU 200ML	100
+THAILAM	SAHACHARADI MEZHUKU PAKAM 450ML	220
+THAILAM	SAHACHARADI MEZHUKU PAKAM 200ML	100
+THAILAM	SAHACHARADI TAILAM 450ML	220
+THAILAM	SAHACHARADI TAILAM 200ML	100
+THAILAM	SAHACHARADI TAILAM 100ML	55
+THAILAM	SUDHABALA TAILAM 450ML	170
+THAILAM	SUDHABALA TAILAM 200ML	77
+THAILAM	SUDHA DHURVADI 450ML	395
+THAILAM	SUDHA DHURVADI 200ML	178
+THAILAM	SWASASHINI OIL 450ML	320
+THAILAM	THEKARAJADI OIL 450ML	225
+THAILAM	THEKARAJADI OIL 200ML	101
+THAILAM	THENGINPUSHPADI KERAM 450ML	310
+THAILAM	THENGINPUSHPADI KERAM 200ML	140
+THAILAM	TRIPHALADI KERAM 450ML	307
+THAILAM	TRIPHALADI KERAM 200ML	139
+THAILAM	TRIPHALADI KERAM 100ML	70
+THAILAM	TRIPHALADI THAILAM 450ML	195
+THAILAM	TRIPHALADI THAILAM 200ML	87
+THAILAM	TULASI SWARASADI OIL 450ML	307
+THAILAM	TULASI SWARASADI OIL 200ML	139
+THAILAM	TULASI SWARASADI OIL 100ML	70
+THAILAM	VAJRAKA TAILAM 450ML	187
+THAILAM	VAJRAKA TAILAM 200ML	84
+THAILAM	VAJRAKA TAILAM 100ML	48
+THAILAM	VATASHINI TAILAM 450ML	310
+THAILAM	VATASHINI TAILAM 200ML	135
+THAILAM	VATASHINI TAILAM 100ML	74
+THAILAM	DINESHA ELADI COCONUT OIL 450ML	307
+THAILAM	DINESHA ELADI COCONUT OIL 200ML	139
+THAILAM	VATA MARDARAN KUZHAMBU 450ML	362
+THAILAM	VATA MARDARAN KUZHAMBU 200ML	164
+ARKAM	MAHISHA ARKAM 450ML	70
+ARKAM	AYAMODAKA ARKAM 450ML	70
+KC	AMRUTHOTHARM KC 1KG	180
+KC	AMRUTHOTHARM KC 250GM	45
+KC	ASHTAVARGAM KC 1KG	175
+KC	ASHTAVARGAM KC 250GM	45
+KC	BRIHATYADI KC 1KG	150
+KC	BRIHATYADI KC 250GM	38
+KC	CHERIYA RASNADI KC 1KG	235
+KC	CHERIYA RASNADI KC 250GM	60
+KC	CHIRUVILWADI  KC 1KG	285
+KC	CHIRUVILWADI  KC 250GM	72
+KC	DASHAMOOL KADUTHRAYADI KC 1KG	210
+KC	DASHAMOOL KADUTHRAYADI KC 250GM	54
+KC	DHANADANAYANADI KC 1KG	180
+KC	DHANADANAYANADI KC 250GM	50
+KC	DHANWANTARAM KC 1KG	185
+KC	DHANWANTARAM KC 250GM	47
+KC	DRAKSADI KC 1KG	625
+KC	DRAKSADI KC 250GM	158
+KC	ELAKANADI  KC 1KG	390
+KC	ELAKANADI  KC 250GM	98
+KC	GANDHARVA HASTHADI  KC 1KG	190
+KC	GANDHARVA HASTHADI  KC 250GM	48
+KC	GULGULU TIKTAKAM  KC 1KG	275
+KC	GULGULU TIKTAKAM  KC 250GM	69
+KC	INDUKANTHAM KC 1KG	178
+KC	INDUKANTHAM KC 250GM	44
+KC	KOKILAKSHAM KC 1KG	180
+KC	KOKILAKSHAM KC 250GM	45
+KC	MAHA MANJISHTADI KC 1KG	200
+KC	MAHA MANJISHTADI KC 250GM	50
+KC	MAHA RASNADI KC 1KG	255
+KC	MAHA RASNADI KC 250GM	66
+KC	MAHATIKTAKAM KC 1KG	255
+KC	MAHATIKTAKAM KC 250GM	66
+KC	MUSALIKHADIRADI KC 1KG	155
+KC	MUSALIKHADIRADI KC 250GM	40
+KC	NAYOPAYAM KC 1KG	260
+KC	NAYOPAYAM KC 250GM	65
+KC	NIMBADI KC 1KG	180
+KC	NIMBADI KC 250GM	50
+KC	NISHAKATAKADI KC 1KG	190
+KC	NISHAKATAKADI KC 250GM	48
+KC	PATHYASHADHATHRYADI KC 1KG	130
+KC	PATHYASHADHATHRYADI KC 250GM	35
+KC	PATOLA MOOLADI KC 1KG	900
+KC	PATOLA MOOLADI KC 250GM	230
+KC	PATOLAKADUROHINYADI KC 1KG	950
+KC	PATOLAKADUROHINYADI KC 250GM	237
+KC	PRASARINNIADI KC 1KG	230
+KC	PRASARINNIADI KC 250GM	60
+KC	PUNARNAVADI KC 1KG	198
+KC	PUNARNAVADI KC 250GM	50
+KC	RASNASAPTAKAM KC 1KG	155
+KC	RASNASAPTAKAM KC 250GM	40
+KC	RASNOUPAKULYADI KC 1KG	230
+KC	RASNOUPAKULYADI KC 250GM	60
+KC	SAHACHARADI KC 1KG	215
+KC	SAHACHARADI KC 250GM	55
+KC	SAPTASARAM KC 1KG	170
+KC	SAPTASARAM KC 250GM	44
+KC	SATAVARI CHINNARUHADI KC 1KG	230
+KC	SATAVARI CHINNARUHADI KC 250GM	60
+KC	SUKUMARAM KC 1KG	198
+KC	SUKUMARAM KC 250GM	50
+KC	THIPPALI KC 1KG	215
+KC	THIPPALI KC 250GM	55
+KC	TIKTAKAM  KC 1KG	230
+KC	TIKTAKAM  KC 250GM	60
+KC	VARADI KC 1KG	200
+KC	VARADI KC 250GM	50
+KC	VARANADI KC 1KG	170
+KC	VARANADI KC 250GM	44
+KC	VASHGULUCHIADI KC 1KG	430
+KC	VASHGULUCHIADI KC 250GM	108
+KC	VIDARYADI KC 1KG	210
+KC	VIDARYADI KC 250GM	54
+KC	VYAGHRYADI KC 1KG	340
+KC	VYAGHRYADI KC 250GM	100
+KC	VYOSHADI KC 1KG	220
+KC	VYOSHADI KC 250GM	56
+KSC	AMRUTHOTHARM KSC 500G	112
+KSC	AMRUTHOTHARM KSC 50G	13
+KSC	ASHTAVARGAM  KSC 500G	126
+KSC	ASHTAVARGAM  KSC 50G	15
+KSC	CHERIYA RASNADI   KSC (RASANAIRANDADI KSC) 500G	126
+KSC	CHERIYA RASNADI   KSC (RASANAIRANDADI KSC) 50G	15
+KSC	DASAMOOLA KATUTHRAYAM KSC 500G	165
+KSC	DASAMOOLA KATUTHRAYAM KSC 50G	17
+KSC	GANDHARVA HASTHADI    KSC 500G	126
+KSC	GANDHARVA HASTHADI    KSC 50G	15
+KSC	GULUCHYADI KSC 500G	111
+KSC	GULUCHYADI KSC 50G	13
+KSC	INDUKANTHAM   KSC 500G	237
+KSC	INDUKANTHAM   KSC 50G	25
+KSC	MAHARASANADI KSC 500G	134
+KSC	MAHARASANADI KSC 50G	15
+KSC	NAYOPAYAM KSC 500G	148
+KSC	NAYOPAYAM KSC 50G	18
+KSC	NISHKATHAKADI KSC 500G	134
+KSC	NISHKATHAKADI KSC 50G	15
+KSC	PADOLA MOOLADI KSC 500G	123
+KSC	PADOLA MOOLADI KSC 50G	14
+KSC	PUNARNAVADI KSC 500G	134
+KSC	PUNARNAVADI KSC 50G	15
+KSC	SAHACHARADI KSC 500G	126
+KSC	SAHACHARADI KSC 50G	15
+PATENT	BEAT CAPSULE 100N	290
+PATENT	BEAT CAPSULE 30N	87
+PATENT	DM CURE CAPSULE 100N	190
+PATENT	DM CURE CAPSULE 30N	57
+PATENT	ZAHEER CAPSULE 100N	845
+PATENT	VETONE TABLET 100N	195
+PATENT	HEMON 200ML	130
+PATENT	HEMON DICOCTION 200ML	130
+PATENT	V COUGH SYRUP 100ML	39
+PATENT	KUKKU HAIR OIL 100ML	130
+PATENT	SMILE PAIN BAM 25GM	45
+PATENT	V TONE LEHYAM 500GM	162
+PATENT	VL FORTE LEHYAM 100GM	78
+PATENT	VETONE CAPSULE 100N	325
+PATENT	THENGIN POOKKULA LEHYAM 400GM	150
+PATENT AJAMAMSA RASAYANAM 400GM 169
+`;
+ const meds = rawData.trim().split('\n').map(line => {
+        const parts = line.trim().split(/\s+/);
+        const rate = parseFloat(parts.pop());
+        const type = parts.shift();
+        const name = parts.join(' ');
+        return { type, name, rate };
+    });
+
+    let order = {};
+
+    function init() {
+        let draft = localStorage.getItem('ks_final_draft');
+        if(draft) {
+            let data = JSON.parse(draft);
+            document.getElementById('instName').value = data.instName || "";
+            document.getElementById('budget').value = data.budget || 0;
+            order = data.order || {};
+        }
+        renderTable();
+    }
+
+    function renderTable() {
+        const filter = document.getElementById('typeFilter').value;
+        const showSel = document.getElementById('showSel').checked;
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const tbody = document.getElementById('tableBody');
+        let html = ''; let total = 0; let sl = 1;
+
+        meds.forEach(m => {
+            let q = order[m.name] || 0;
+            if (filter !== "ALL" && m.type !== filter) return;
+            if (showSel && q === 0) return;
+            if (searchTerm && !m.name.toLowerCase().includes(searchTerm)) return;
+
+            let price = (m.rate * 1.05).toFixed(2);
+            let sub = (price * q).toFixed(2);
+            total += parseFloat(sub);
+
+            html += `<tr class="${q > 0 ? 'selected-row' : ''}">
+                <td>${sl++}</td><td>${m.name}</td><td>${price}</td>
+                <td><input type="number" class="qty-input" value="${q}" onchange="updateQty('${m.name}', this.value)"></td>
+                <td>₹${sub}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        document.getElementById('grandTotal').innerText = total.toFixed(2);
+        let bud = parseFloat(document.getElementById('budget').value) || 0;
+        document.getElementById('balance').innerText = (bud - total).toFixed(2);
+    }
+
+    function updateQty(name, val) {
+        let q = parseInt(val) || 0;
+        if(q > 0) order[name] = q; else delete order[name];
+        saveDraft(); renderTable();
+    }
+
+    function saveDraft() {
+        localStorage.setItem('ks_final_draft', JSON.stringify({
+            instName: document.getElementById('instName').value,
+            budget: document.getElementById('budget').value,
+            order: order
+        }));
+    }
+
+    function resetForm() {
+        if(confirm("Reset all data?")) { order = {}; localStorage.removeItem('ks_final_draft'); location.reload(); }
+    }
+
+    // --- ശരിയായ CALCULATE TOTAL ഫംഗ്ഷൻ ---
+    function calculateTotal() {
+        return meds.reduce((s, m) => {
+            const q = order[m.name] || 0;
+            return s + (q * (m.rate * 1.05));
+        }, 0);
+    }
+
+    // --- ഫിക്സ്ഡ് സ്മാർട്ട് ഓട്ടോമേഷൻ ---
+// --- സ്മാർട്ട് ഓട്ടോമേഷൻ ലോജിക് (പൂർണ്ണരൂപം) ---
+
+function smartAutomate() {
+    try {
+        const budgetInput = document.getElementById('budget');
+        const budget = parseFloat(budgetInput.value) || 0;
+
+        if (budget <= 0) {
+            alert("ദയവായി ബജറ്റ് തുക നൽകുക!");
+            return;
+        }
+
+        let selectedNames = Object.keys(order).filter(n => order[n] > 0);
+
+        if (selectedNames.length === 0) {
+            const filter = document.getElementById('typeFilter').value;
+            const list = meds.filter(m => filter === "ALL" || m.type === filter);
+            if (confirm("മരുന്നുകൾ തിരഞ്ഞെടുത്തിട്ടില്ല. ഓരോന്ന് വീതം ചേർക്കട്ടെ?")) {
+                list.forEach(m => {
+                    if (calculateTotal() + (m.rate * 1.05) <= budget) {
+                        order[m.name] = 1;
+                    }
+                });
+            }
+        } else {
+            // 1. പ്രാഥമിക അഡ്ജസ്റ്റ്മെന്റ്
+            let currentTotal = calculateTotal();
+            if (currentTotal > budget) {
+                scaleDownProportional(budget, selectedNames);
+            } else {
+                fillProportional(budget, selectedNames);
+            }
+
+            // 2. ആവർത്തിച്ചുള്ള സ്വാപ്പിംഗ് (Automated Loop)
+            // മരുന്നുകൾ അങ്ങോട്ടും ഇങ്ങോട്ടും മാറ്റി ബജറ്റ് പരമാവധി അടുപ്പിക്കുന്നു
+            let improved = true;
+            let safetyLimit = 0;
+            while (improved && safetyLimit < 100) {
+                improved = fineTuneBySwapping(budget, selectedNames);
+                safetyLimit++;
+            }
+        }
+
+        // 3. ഇനിയും വിടവുണ്ടെങ്കിൽ പുതിയ മരുന്ന് നിർദ്ദേശിക്കുന്നു
+        fineTuneBudgetSuggestions(budget);
+
+        renderTable();
+        saveDraft();
+        alert("ഓട്ടോമേഷൻ പൂര്‍ത്തിയായി.");
+    } catch (e) {
+        console.error(e);
+        alert("ഓട്ടോമേഷൻ പ്രവർത്തിക്കുന്നതിൽ തടസ്സം നേരിട്ടു. കോഡിലെ ഡാറ്റാ ഫോർമാറ്റ് പരിശോധിക്കുക.");
+    }
+}
+
+// സ്വാപ്പിംഗ് ലോജിക് (ബജറ്റ് അടുപ്പിക്കാൻ എണ്ണം അങ്ങോട്ടും ഇങ്ങോട്ടും മാറ്റുന്നു)
+function fineTuneBySwapping(limit, names) {
+    let currentTotal = calculateTotal();
+    let gap = limit - currentTotal;
+    if (gap < 1) return false; 
+
+    let activeMeds = meds.filter(m => names.includes(m.name));
+    
+    for (let m of activeMeds) {
+        if (order[m.name] > 0) {
+            let mPrice = m.rate * 1.05;
+            for (let alt of activeMeds) {
+                let altPrice = alt.rate * 1.05;
+                
+                // നിലവിലുള്ള 'm' ഒന്ന് കുറച്ച് 'alt' ഒന്ന് കൂട്ടിയാൽ ബജറ്റിനോട് അടുക്കുമോ എന്ന് നോക്കുന്നു
+                let potentialTotal = (currentTotal - mPrice) + altPrice;
+                
+                if (potentialTotal <= limit && potentialTotal > currentTotal + 0.1) {
+                    order[m.name]--;
+                    order[alt.name] = (order[alt.name] || 0) + 1;
+                    return true; // ഒരു മാറ്റം വരുത്തി, വീണ്ടും ലൂപ്പ് ചെയ്യാൻ അനുവാദം നൽകുന്നു
+                }
+            }
+        }
+    }
+    return false;
+}
+
+function fillProportional(limit, names) {
+    let activeMeds = meds.filter(m => names.includes(m.name));
+    let added = true;
+    while (added) {
+        added = false;
+        for (let m of activeMeds) {
+            if (calculateTotal() + (m.rate * 1.05) <= limit) {
+                order[m.name] = (order[m.name] || 0) + 1;
+                added = true;
+            }
+        }
+    }
+}
+
+function scaleDownProportional(limit, names) {
+    let activeMeds = meds.filter(m => names.includes(m.name)).sort((a, b) => b.rate - a.rate);
+    let changed = true;
+    while (calculateTotal() > limit && changed) {
+        changed = false;
+        for (let m of activeMeds) {
+            if (order[m.name] > 1) {
+                order[m.name]--;
+                changed = true;
+                if (calculateTotal() <= limit) break;
+            }
+        }
+        if (!changed && calculateTotal() > limit) {
+            for (let m of activeMeds) {
+                if (order[m.name] > 0) {
+                    order[m.name]--;
+                    changed = true;
+                    if (calculateTotal() <= limit) break;
+                }
+            }
+        }
+    }
+}
+
+function fineTuneBudgetSuggestions(limit) {
+    let gap = limit - calculateTotal();
+    if (gap < 5) return;
+
+    let selectedNames = Object.keys(order);
+    let suggestions = meds
+        .filter(m => !selectedNames.includes(m.name) && (m.rate * 1.05) <= gap)
+        .sort((a, b) => b.rate - a.rate)
+        .slice(0, 3);
+
+    if (suggestions.length > 0) {
+        let msg = `ബജറ്റിൽ ₹${gap.toFixed(2)} കൂടി ബാക്കിയുണ്ട്. ഇത് പൂർണ്ണമായും ഉപയോഗിക്കാൻ താഴെ പറയുന്ന മരുന്നുകളിൽ ഒന്ന് ചേർക്കട്ടെ?\n\n`;
+        suggestions.forEach((s, i) => {
+            msg += `${i + 1}. ${s.name} (₹${(s.rate * 1.05).toFixed(2)})\n`;
+        });
+        let choice = prompt(msg + "\nനമ്പർ നൽകുക അല്ലെങ്കിൽ Cancel അടിക്കുക:");
+        if (choice && suggestions[choice - 1]) {
+            order[suggestions[choice - 1].name] = 1;
+            renderTable();
+        }
+    }
+}
+
+// ടോട്ടൽ കൃത്യമായി കണക്കാക്കാൻ
+function calculateTotal() {
+    return meds.reduce((s, m) => {
+        const q = order[m.name] || 0;
+        return s + (q * (m.rate * 1.05));
+    }, 0);
+}
+
+function generatePDF() {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const inst = document.getElementById('instName').value || "N/A";
+        const budget = parseFloat(document.getElementById('budget').value) || 0;
+        const today = new Date();
+        const formattedDate = String(today.getDate()).padStart(2, '0') + '-' + 
+                              String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                              today.getFullYear();
+
+        const totalPagesExp = "{total_pages_count_string}";
+
+        // --- ഹെഡർ ഭാഗം ---
+        doc.setFontSize(16);
+        doc.setTextColor(27, 94, 32); // ഗ്രീൻ കളർ ഹെഡറിന് മാത്രം
+        doc.text("KERALASREE AYURVEDIC ORDER FORM", 105, 15, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0); // കറുപ്പ് നിറം
+        doc.text(`Institution: ${inst}`, 14, 25);
+        doc.text(`Date: ${formattedDate}`, 196, 25, { align: "right" });
+
+        // --- ബജറ്റ് സമ്മറി ബോക്സ് ---
+        let currentTotal = calculateTotal();
+        doc.setDrawColor(0, 0, 0); // വരകൾക്കും കറുപ്പ് നിറം
+        doc.line(14, 28, 196, 28);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text(`Total Budget: RS. ${budget.toFixed(2)}`, 14, 34);
+        doc.text(`Order Value: RS. ${currentTotal.toFixed(2)}`, 85, 34);
+        doc.text(`Balance: RS. ${(budget - currentTotal).toFixed(2)}`, 155, 34);
+        doc.line(14, 37, 196, 37);
+
+        let rows = []; 
+        let sl = 1;
+        meds.forEach(m => {
+            if(order[m.name] > 0) {
+                let r = (m.rate * 1.05).toFixed(2);
+                let s = (r * order[m.name]).toFixed(2);
+                rows.push([sl++, m.name, r, order[m.name], s]);
+            }
+        });
+
+        // --- ടേബിൾ ജനറേഷൻ ---
+        doc.autoTable({
+            startY: 42,
+            head: [['Sl', 'Medicine Name', 'Rate+GST', 'Qty', 'Total']],
+            body: rows,
+            theme: 'striped',
+            headStyles: { fillColor: [27, 94, 32], halign: 'center', textColor: [255, 255, 255] },
+            bodyStyles: { textColor: [0, 0, 0], fontSize: 10 }, // ടേബിൾ കണ്ടന്റ് കറുപ്പ് നിറത്തിൽ
+            columnStyles: {
+                0: { halign: 'center' },
+                2: { halign: 'right' },
+                3: { halign: 'center' },
+                4: { halign: 'right' }
+            },
+            margin: { bottom: 40 },
+            didDrawPage: function (data) {
+                let pageSize = doc.internal.pageSize;
+                let pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+                
+                let pageStr = "Page " + doc.internal.getNumberOfPages();
+                if (typeof doc.putTotalPages === 'function') {
+                    pageStr = pageStr + " of " + totalPagesExp;
+                }
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0); // പേജ് നമ്പറും കറുപ്പ്
+                doc.text(pageStr, 196, pageHeight - 10, { align: "right" });
+            }
+        });
+
+        // --- അവസാന ഭാഗം (Grand Total & Budget Note) ---
+        const finalY = doc.lastAutoTable.finalY + 10;
+        const pageHeight = doc.internal.pageSize.height;
+        let yPos = (finalY > pageHeight - 40) ? (doc.addPage(), 20) : finalY;
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // കറുപ്പ് നിറം
+        doc.text(`Total Including GST: RS. ${currentTotal.toFixed(2)}`, 14, yPos + 5);
+        
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold'); // ബജറ്റ് നോട്ട് ബോൾഡ് ആക്കി
+        doc.text(`Please limit this order to budget amount RS. ${budget.toFixed(2)}`, 14, yPos + 15);
+
+        if (typeof doc.putTotalPages === 'function') {
+            doc.putTotalPages(totalPagesExp);
+        }
+
+        doc.save(`${inst}_Order.pdf`);
+    } catch (error) {
+        console.error("PDF Error:", error);
+        alert("PDF നിർമ്മിക്കുന്നതിൽ പിശക് സംഭവിച്ചു.");
+    }
+}
+
+    function exportJSON() {
+        let blob = new Blob([localStorage.getItem('ks_final_draft')], {type:'application/json'});
+        let a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `Order.json`; a.click();
+    }
+
+    function importJSON(e) {
+        let reader = new FileReader();
+        reader.onload = (ev) => { localStorage.setItem('ks_final_draft', ev.target.result); location.reload(); };
+        reader.readAsText(e.target.files[0]);
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
